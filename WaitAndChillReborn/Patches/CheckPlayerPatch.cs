@@ -9,11 +9,12 @@
     {
         private static bool Prefix(ReferenceHub hub, ref bool __result)
         {
-            if (hub == ReferenceHub.HostHub || hub.roleManager.CurrentRole.RoleTypeId == RoleTypeId.Overwatch)
-                return true;
-        
-            __result = true;
-            return false;
+            if (WaitAndChillReborn.Singleton.Config.LobbyConfig.RolesToChoose.Contains(hub.roleManager.CurrentRole.RoleTypeId))
+            {
+                __result = true;
+                return false;
+            }
+            return true;
         }
     }
 }

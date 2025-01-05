@@ -35,9 +35,6 @@
         [Description("Whether plugin should use all of lobby rooms on the list instead only one. Player when they join will be teleported to the random lobby room.")]
         public bool MultipleRooms { get; private set; } = false;
 
-        [Description("The time (in seconds) between player joining on the server and him changing role while in lobby (change this number if some players aren't spawned / are spawned as a None class.")]
-        public float SpawnDelay { get; private set; } = 0.25f;
-
         [Description("List of roles which players can spawn as:")]
         public List<RoleTypeId> RolesToChoose { get; private set; } = new()
         {
@@ -48,7 +45,11 @@
         public List<string> Inventory { get; private set; } = new()
         {
             ItemType.Coin.ToString(),
+            ItemType.Flashlight.ToString(),
         };
+
+        [Description("does the Ammo will be Infinite lobby:")]
+        public bool InfiniteAmmo { get; private set; } = false;
 
         [Description("List of ammo given to a player while in lobby:")]
         public Dictionary<AmmoType, ushort> Ammo { get; private set; } = new()

@@ -11,57 +11,58 @@
     using Exiled.Events.EventArgs.Player;
     using GameCore;
     using InventorySystem.Items.Pickups;
-    using InventorySystem.Items.ThrowableProjectiles;
     using MEC;
-    using Mirror;
     using UnityEngine;
     using static API.API;
-    using Log = Exiled.API.Features.Log;
-    using Object = UnityEngine.Object;
+    using ItemEvent = Exiled.Events.Handlers.Item;
     using PlayerEvent = Exiled.Events.Handlers.Player;
     using ServerEvent = Exiled.Events.Handlers.Server;
     using MapEvent = Exiled.Events.Handlers.Map;
-    using Player = Exiled.API.Features.Player;
-    using Scp106Event = Exiled.Events.Handlers.Scp106;
     using Server = Exiled.API.Features.Server;
+    using Exiled.Events.EventArgs.Item;
+    using System.Linq;
+    using Exiled.API.Features;
+    using Exiled.Events.EventArgs.Map;
 
     internal static class EventHandlers
     {
         internal static void RegisterEvents()
         {
-            ServerEvent.WaitingForPlayers += OnWaitingForPlayers;
+            MapEvent.Generated += OnWaitingForPlayers;
+            ItemEvent.ChangingAmmo += OnChangingAmmo;
 
             PlayerEvent.Verified += OnVerified;
+            PlayerEvent.Destroying += OnDestroying;
             PlayerEvent.Spawned += OnSpawned;
             PlayerEvent.Dying += OnDying;
             PlayerEvent.Died += OnDied;
 
-            MapEvent.PlacingBlood += OnDeniableEvent;
+            MapEvent.PlacingBulletHole += OnDeniableEvent;
+            // MapEvent.PlacingBlood += OnDeniableEvent;
             PlayerEvent.SpawningRagdoll += OnDeniableEvent;
             PlayerEvent.IntercomSpeaking += OnDeniableEvent;
-            PlayerEvent.DroppingItem += OnDeniableEvent;
-            PlayerEvent.DroppingAmmo += OnDeniableEvent;
             PlayerEvent.InteractingDoor += OnDeniableEvent;
             PlayerEvent.InteractingElevator += OnDeniableEvent;
             PlayerEvent.InteractingLocker += OnDeniableEvent;
+            PlayerEvent.DamagingWindow += OnDeniableEvent;
             MapEvent.ChangingIntoGrenade += OnDeniableEvent;
-
-            // Scp106Event.CreatingPortal += OnDeniableEvent;
-            Scp106Event.Teleporting += OnDeniableEvent;
 
             ServerEvent.RoundStarted += OnRoundStarted;
         }
 
         internal static void UnRegisterEvents()
         {
-            ServerEvent.WaitingForPlayers -= OnWaitingForPlayers;
+            MapEvent.Generated -= OnWaitingForPlayers;
 
+            ItemEvent.ChangingAmmo -= OnChangingAmmo;
             PlayerEvent.Verified -= OnVerified;
+            PlayerEvent.Destroying -= OnDestroying;
             PlayerEvent.Spawned -= OnSpawned;
             PlayerEvent.Dying -= OnDying;
             PlayerEvent.Died -= OnDied;
 
-            MapEvent.PlacingBlood -= OnDeniableEvent;
+            MapEvent.PlacingBulletHole -= OnDeniableEvent;
+            // MapEvent.PlacingBlood -= OnDeniableEvent;
             PlayerEvent.SpawningRagdoll -= OnDeniableEvent;
             PlayerEvent.IntercomSpeaking -= OnDeniableEvent;
             PlayerEvent.DroppingItem -= OnDeniableEvent;
@@ -69,12 +70,18 @@
             PlayerEvent.InteractingDoor -= OnDeniableEvent;
             PlayerEvent.InteractingElevator -= OnDeniableEvent;
             PlayerEvent.InteractingLocker -= OnDeniableEvent;
+            PlayerEvent.DamagingWindow -= OnDeniableEvent;
             MapEvent.ChangingIntoGrenade -= OnDeniableEvent;
 
-            // Scp106Event.CreatingPortal -= OnDeniableEvent;
-            Scp106Event.Teleporting -= OnDeniableEvent;
-
             ServerEvent.RoundStarted -= OnRoundStarted;
+        } 
+        private static void OnDestropAdded(PickupAddedEventArgs pickup)
+        {
+            PickupsToDestroy.Add(pickup.Pickup);
+        }
+        private static void OnPickupDestroyed(PickupDestroyedEventArgs pickup)
+        {
+            PickupsToDestroy.Remove(pickup.Pickup);
         }
 
         private static void OnWaitingForPlayers()
@@ -94,153 +101,134 @@
             Scp173Role.TurnedPlayers.Clear();
             Scp096Role.TurnedPlayers.Clear();
 
-            Timing.CallDelayed(0.1f, Methods.SetupAvailablePositions);
+            Methods.SetupAvailablePositions();
 
-            Timing.CallDelayed(
-                1f,
-                () =>
+            LockedPickups.Clear();
+            PickupsToDestroy.Clear();
+            foreach (Pickup pickup in Pickup.List)
+            {
+                try
                 {
-                    LockedPickups.Clear();
-
-                    foreach (Pickup pickup in Pickup.List)
+                    if (!pickup.IsLocked)
                     {
-                        try
-                        {
-                            if (!pickup.IsLocked)
-                            {
-                                PickupSyncInfo info = pickup.Base.NetworkInfo;
-                                info.Locked = true;
-                                pickup.Base.NetworkInfo = info;
+                        PickupSyncInfo info = pickup.Base.NetworkInfo;
+                        info.Locked = true;
+                        pickup.Base.NetworkInfo = info;
 
-                                pickup.Base.GetComponent<Rigidbody>().isKinematic = true;
-                                LockedPickups.Add(pickup);
-                            }
-                        }
-                        catch (System.Exception)
-                        {
-                            // ignored
-                        }
+                        pickup.Base.GetComponent<Rigidbody>().isKinematic = true;
+                        LockedPickups.Add(pickup);
                     }
-                });
-        }
+                }
+                catch (System.Exception)
+                {
+                    // ignored
+                }
+            }
 
+            MapEvent.PickupAdded += OnDestropAdded;
+            MapEvent.PickupDestroyed += OnPickupDestroyed;
+        }
+        private static void OnChangingAmmo(ChangingAmmoEventArgs ev)
+        {
+            if (!Round.IsLobby)
+                return;
+            if (ev.NewAmmo < ev.OldAmmo)
+                ev.IsAllowed = false;
+        }
         private static void OnVerified(VerifiedEventArgs ev)
         {
-            if (!IsLobby)
+            if (!Round.IsLobby)
                 return;
 
             if (RoundStart.singleton.NetworkTimer > 1 || RoundStart.singleton.NetworkTimer == -2)
             {
-                Timing.CallDelayed(
-                    Config.SpawnDelay,
-                    () =>
-                    {
-                        ev.Player.Role.Set(Config.RolesToChoose[Random.Range(0, Config.RolesToChoose.Count)]);
+                ev.Player.Role.Set(Config.RolesToChoose[Random.Range(0, Config.RolesToChoose.Count)]);
 
-                        if (Config.TurnedPlayers)
-                        {
-                            Scp096Role.TurnedPlayers.Add(ev.Player);
-                            Scp173Role.TurnedPlayers.Add(ev.Player);
-                        }
-                    });
+                if (Config.TurnedPlayers)
+                {
+                    Scp096Role.TurnedPlayers.Add(ev.Player);
+                    Scp173Role.TurnedPlayers.Add(ev.Player);
+                }
             }
         }
+        private static void OnDestroying(DestroyingEventArgs ev)
+        {
+            if (!Round.IsLobby)
+                return;
 
+            foreach (Pickup pickup in PickupsToDestroy.ToList())
+                if (pickup.PreviousOwner == ev.Player)
+                    pickup.Destroy();
+        }
         private static void OnSpawned(SpawnedEventArgs ev)
         {
-            if (!IsLobby)
+            if (!Round.IsLobby)
                 return;
 
             if (RoundStart.singleton.NetworkTimer <= 1 && RoundStart.singleton.NetworkTimer != -2)
                 return;
 
-            ev.Player.Position = Config.MultipleRooms switch
+            ev.Player.Position = Config.MultipleRooms ? LobbyAvailableSpawnPoints[Random.Range(0, LobbyAvailableSpawnPoints.Count)] : LobbyChoosedSpawnPoint;
+
+            Exiled.CustomItems.API.Extensions.ResetInventory(ev.Player, Config.Inventory);
+
+            foreach (KeyValuePair<AmmoType, ushort> ammo in Config.Ammo)
+                ev.Player.Ammo[ammo.Key.GetItemType()] = ammo.Value;
+
+            foreach (KeyValuePair<EffectType, byte> effect in Config.LobbyEffects)
             {
-                true => LobbyAvailableSpawnPoints[Random.Range(0, LobbyAvailableSpawnPoints.Count)],
-                false => LobbyChoosedSpawnPoint
-            };
+                if (!ev.Player.TryGetEffect(effect.Key, out StatusEffectBase? effectBase))
+                    continue;
 
-            _ = !Config.MultipleRooms ? ev.Player.Position = LobbyChoosedSpawnPoint : ev.Player.Position = LobbyAvailableSpawnPoints[Random.Range(0, LobbyAvailableSpawnPoints.Count)];
-
-            Timing.CallDelayed(
-                0.3f,
-                () =>
-                {
-                    Exiled.CustomItems.API.Extensions.ResetInventory(ev.Player, Config.Inventory);
-
-                    foreach (KeyValuePair<AmmoType, ushort> ammo in Config.Ammo)
-                        ev.Player.Ammo[ammo.Key.GetItemType()] = ammo.Value;
-
-                    foreach (KeyValuePair<EffectType, byte> effect in Config.LobbyEffects)
-                    {
-                        if (!ev.Player.TryGetEffect(effect.Key, out StatusEffectBase? effectBase))
-                            continue;
-
-                        effectBase.ServerSetState(effect.Value, float.MaxValue);
-                    }
-                });
+                effectBase.ServerSetState(effect.Value);
+            }
         }
 
-        private static void OnDeniableEvent(IExiledEvent ev)
+        private static void OnDeniableEvent(IDeniableEvent ev)
         {
-            if (IsLobby && ev is IDeniableEvent deniableEvent)
-                deniableEvent.IsAllowed = false;
+            if (Round.IsLobby)
+                ev.IsAllowed = false;
         }
 
-        private static void OnDying(DyingEventArgs ev)
+        private static void OnDying(IPlayerEvent ev)
         {
-            if (IsLobby)
+            if (Round.IsLobby)
                 ev.Player.ClearInventory();
         }
 
         private static void OnDied(DiedEventArgs ev)
         {
-            if (!IsLobby || (RoundStart.singleton.NetworkTimer <= 1 && RoundStart.singleton.NetworkTimer != -2))
+            if (!Round.IsLobby || (RoundStart.singleton.NetworkTimer <= 1 && RoundStart.singleton.NetworkTimer != -2))
                 return;
 
-            Timing.CallDelayed(Config.SpawnDelay, () => ev.Player.Role.Set(Config.RolesToChoose[Random.Range(0, Config.RolesToChoose.Count)]));
+            ev.Player.Role.Set(Config.RolesToChoose[Random.Range(0, Config.RolesToChoose.Count)]);
 
-            Timing.CallDelayed(
-                Config.SpawnDelay * 2.5f,
-                () =>
-                {
-                    ev.Player.Position = Config.MultipleRooms switch
-                    {
-                        true => LobbyAvailableSpawnPoints[Random.Range(0, LobbyAvailableSpawnPoints.Count)],
-                        false => LobbyChoosedSpawnPoint
-                    };
+            ev.Player.Position = Config.MultipleRooms ? LobbyAvailableSpawnPoints[Random.Range(0, LobbyAvailableSpawnPoints.Count)] : LobbyChoosedSpawnPoint;
 
-                    foreach (KeyValuePair<EffectType, byte> effect in Config.LobbyEffects)
-                    {
-                        ev.Player.EnableEffect(effect.Key);
-                        ev.Player.ChangeEffectIntensity(effect.Key, effect.Value);
-                    }
+            foreach (KeyValuePair<EffectType, byte> effect in Config.LobbyEffects)
+            {
+                ev.Player.EnableEffect(effect.Key);
+                ev.Player.ChangeEffectIntensity(effect.Key, effect.Value);
+            }
 
-                    Timing.CallDelayed(
-                        0.3f,
-                        () =>
-                        {
-                            Exiled.CustomItems.API.Extensions.ResetInventory(ev.Player, Config.Inventory);
+            Exiled.CustomItems.API.Extensions.ResetInventory(ev.Player, Config.Inventory);
 
-                            foreach (KeyValuePair<AmmoType, ushort> ammo in Config.Ammo)
-                                ev.Player.Ammo[ammo.Key.GetItemType()] = ammo.Value;
-                        });
-                });
+            foreach (KeyValuePair<AmmoType, ushort> ammo in Config.Ammo)
+                ev.Player.Ammo[ammo.Key.GetItemType()] = ammo.Value;
         }
 
         private static void OnRoundStarted()
         {
-            foreach (ThrownProjectile throwable in Object.FindObjectsOfType<ThrownProjectile>())
+            foreach (Pickup pickup in Pickup.List.ToList())
             {
-                if (throwable.TryGetComponent(out Rigidbody rb) && rb.velocity.sqrMagnitude <= 1f)
+                if (PickupsToDestroy.Contains(pickup))
+                {
+                    pickup.Destroy();
                     continue;
-
-                throwable.transform.position = Vector3.zero;
-                Timing.CallDelayed(1f, () => NetworkServer.Destroy(throwable.gameObject));
+                }
+                if (LockedPickups.Contains(pickup))
+                    pickup.Base.GetComponent<Rigidbody>().isKinematic = false;
             }
-
-            foreach (Player player in Player.List)
-                player.DisableAllEffects();
 
             if (Config.TurnedPlayers)
             {
@@ -250,8 +238,6 @@
 
             if (Server.FriendlyFire)
                 FriendlyFireConfig.PauseDetector = false;
-
-            Methods.Scp079sDoors(false);
 
             if (LobbyTimer.IsRunning)
                 Timing.KillCoroutines(LobbyTimer);
@@ -273,9 +259,13 @@
             }
 
             LockedPickups.Clear();
+            PickupsToDestroy.Clear();
+            MapEvent.PickupAdded -= OnDestropAdded;
+            MapEvent.PickupDestroyed -= OnPickupDestroyed;
         }
 
         private static readonly HashSet<Pickup> LockedPickups = new();
+        private static readonly HashSet<Pickup> PickupsToDestroy = new();
         private static readonly LobbyConfig Config = WaitAndChillReborn.Singleton.Config.LobbyConfig;
     }
 }

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <LangVersion>10</LangVersion>
     <TargetFramework>net48</TargetFramework>
-    <Nullable>enable</Nullable>
+    <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>WaitAndChillReborn</AssemblyName>
     <RootNamespace>WaitAndChillReborn</RootNamespace>
@@ -11,17 +11,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>D:\SteamLibrary\steamapps\common\SCP Secret Laboratory Dedicated Server\SCPSL_Data\Managed\Assembly-CSharp-firstpass.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine" HintPath="$(EXILED_REFERENCES)\UnityEngine.dll" />
     <Reference Include="UnityEngine.AnimationModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL" HintPath="$(EXILED_REFERENCES)\UnityEngine.AnimationModule.dll" SpecificVersion="False" />
     <Reference Include="UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL" SpecificVersion="False" HintPath="$(EXILED_REFERENCES)\UnityEngine.CoreModule.dll" />
     <Reference Include="UnityEngine.AssetBundleModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL" SpecificVersion="False" HintPath="$(EXILED_REFERENCES)\UnityEngine.AssetBundleModule.dll" />
     <Reference Include="UnityEngine.PhysicsModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL" SpecificVersion="False" HintPath="$(EXILED_REFERENCES)\UnityEngine.PhysicsModule.dll" />
     <Reference Include="Mirror" HintPath="$(EXILED_REFERENCES)\Mirror.dll" />
-    <Reference Include="Assembly-CSharp-firstpass" HintPath="$(EXILED_REFERENCES)\Assembly-CSharp-firstpass.dll" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="EXILED" Version="7.0.5" />
+    <PackageReference Include="ExMod.Exiled" Version="9.2.1" />
     <PackageReference Include="Lib.Harmony" Version="2.2.1" />
   </ItemGroup>
 

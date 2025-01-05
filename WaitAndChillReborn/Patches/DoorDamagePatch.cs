@@ -1,5 +1,6 @@
 ﻿namespace WaitAndChillReborn.Patches
 {
+    using Exiled.API.Features;
     using HarmonyLib;
     using Interactables.Interobjects;
     using Interactables.Interobjects.DoorUtils;
@@ -8,6 +9,6 @@
     internal static class DoorDamagePatch
     {
         private static bool Prefix(BreakableDoor __instance, float hp, DoorDamageType type) =>
-            !(API.API.IsLobby && type != DoorDamageType.ServerCommand);
+            !(Round.IsLobby && type is not DoorDamageType.ServerCommand);
     }
 }

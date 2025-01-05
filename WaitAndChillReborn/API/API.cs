@@ -12,7 +12,5 @@
         public static List<Vector3> LobbyAvailableSpawnPoints = new();
 
         public static CoroutineHandle LobbyTimer;
-
-        public static bool IsLobby => !Round.IsStarted && !Round.IsEnded;
     }
 }
